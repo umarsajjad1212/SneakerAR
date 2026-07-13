@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HUD Style AR Product Viewer - Pride Edition</title>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: #030a0d;
+            overflow: hidden;
+            color: #00ffcc;
+        }
+
+        /* Ambient HUD Grid Background */
+        .hud-bg-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 204, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 204, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* 3D Model Viewer Layout */
+        model-viewer {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 2;
+            --poster-color: transparent;
+        }
+
+        /* HUD UI Overlay Container */
+        .hud-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+            pointer-events: none;
+            padding: 30px;
+        }
+
+        .interactive {
+            pointer-events: auto;
+        }
+
+        /* Sci-Fi Vignette and Borders */
+        .hud-frame {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            bottom: 15px;
+            border: 1px solid rgba(0, 255, 204, 0.2);
+            pointer-events: none;
+        }
+        .hud-frame::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; width: 20px; height: 20px;
+            border-top: 3px solid #00ffcc; border-left: 3px solid #00ffcc;
+        }
+        .hud-frame::after {
+            content: '';
+            position: absolute;
+            bottom: -1px; right: -1px; width: 20px; height: 20px;
+            border-bottom: 3px solid #00ffcc; border-right: 3px solid #00ffcc;
+        }
+
+        /* Left Sidebar Controls Group */
+        .left-controls-wrapper {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 290px;
+        }
+
+        /* Product Details Box */
+        .product-details {
+            background: rgba(3, 10, 13, 0.8);
+            border-left: 4px solid #00ffcc;
+            padding: 20px;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.1);
+            border-top: 1px solid rgba(0, 255, 204, 0.2);
+            border-bottom: 1px solid rgba(0, 255, 204, 0.2);
+            border-right: 1px solid rgba(0, 255, 204, 0.2);
+        }
+
+        .hud-header {
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: rgba(0, 255, 204, 0.5);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .detail-row {
+            margin-bottom: 15px;
+        }
+
+        .detail-label {
+            font-size: 11px;
+            color: rgba(0, 255, 204, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .detail-value {
+            font-size: 17px;
+            font-weight: bold;
+            color: #ffffff;
+            text-shadow: 0 0 8px rgba(0, 255, 204, 0.6);
+            margin-top: 2px;
+            min-height: 21px;
+        }
+
+        .price-color {
+            color: #00ffcc !important;
+            text-shadow: 0 0 10px rgba(0, 255, 204, 0.8) !important;
+        }
+
+        .sizes-container {
+            display: flex;
+            gap: 6px;
+            margin-top: 5px;
+        }
+
+        .size-badge {
+            border: 1px solid rgba(0, 255, 204, 0.4);
+            padding: 4px 10px;
+            font-size: 12px;
+            color: rgba(0, 255, 204, 0.6);
+            background: rgba(0, 255, 204, 0.05);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            opacity: 0;
+        }
+        
+        .size-badge.show-badge {
+            opacity: 1;
+        }
+
+        .size-badge:hover, .size-badge.selected {
+            border-color: #00ffcc;
+            color: #030a0d;
+            background: #00ffcc;
+            box-shadow: 0 0 10px #00ffcc;
+            font-weight: bold;
+        }
+
+        /* Permanent Blinking Left Badge */
+        .recommendation-badge {
+            font-size: 11px;
+            letter-spacing: 1.5px;
+            color: #00ffcc;
+            background: rgba(0, 255, 204, 0.1);
+            padding: 12px 15px;
+            border: 1px solid rgba(0, 255, 204, 0.4);
+            text-transform: uppercase;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.05);
+            backdrop-filter: blur(5px);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.6s ease-out;
+        }
+
+        .recommendation-badge.active-blink {
+            opacity: 1;
+            transform: translateY(0);
+            animation: infiniteBlink 1.5s infinite alternate ease-in-out;
+        }
+
+        /* UPGRADE: Right Bottom Control Pad + Pride Branding Statement Combo */
+        .right-bottom-wrapper {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 12px;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+        }
+
+        .right-bottom-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            background: rgba(3, 10, 13, 0.6);
+            padding: 10px;
+            border: 1px solid rgba(0, 255, 204, 0.2);
+            backdrop-filter: blur(5px);
+        }
+
+        .control-title {
+            font-size: 8px;
+            color: rgba(0, 255, 204, 0.5);
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        .dpad-row {
+            display: flex;
+            gap: 5px;
+        }
+
+        .dpad-btn {
+            width: 35px;
+            height: 35px;
+            background: rgba(0, 255, 204, 0.05);
+            border: 1px solid rgba(0, 255, 204, 0.4);
+            color: #00ffcc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .dpad-btn:hover {
+            background: #00ffcc;
+            color: #030a0d;
+            box-shadow: 0 0 12px #00ffcc;
+        }
+
+        /* Your Custom Premium Pride Statement Line */
+        .pride-statement {
+            font-size: 10px;
+            color: #ffffff;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            text-shadow: 0 0 8px rgba(0, 255, 204, 0.5);
+            border-bottom: 1px dashed rgba(0, 255, 204, 0.4);
+            padding-bottom: 4px;
+            max-width: 250px;
+            text-align: right;
+        }
+
+        /* View in AR Button Upper Right Corner */
+        .ar-button {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background: rgba(3, 10, 13, 0.7);
+            color: #00ffcc;
+            border: 2px solid #00ffcc;
+            padding: 12px 25px;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.1);
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out, background 0.3s, color 0.3s, box-shadow 0.3s;
+        }
+
+        .ar-button:hover {
+            background: #00ffcc;
+            color: #030a0d;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
+        }
+
+        /* Holographic Scanning Effect Line */
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(to bottom, transparent, #00ffcc, transparent);
+            box-shadow: 0 0 20px #00ffcc, 0 0 40px #00ffcc;
+            z-index: 4;
+            pointer-events: none;
+            display: none;
+        }
+
+        .scan-line.active {
+            display: block;
+            animation: scanAnim 2s linear 2; 
+        }
+
+        /* Scanning Status Overlay Text */
+        .scan-status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            animation: pulse 1s infinite alternate;
+            z-index: 5;
+            pointer-events: none;
+            background: rgba(3, 10, 13, 0.85);
+            padding: 15px 30px;
+            border: 1px dashed #00ffcc;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
+            display: none;
+        }
+
+        /* Target Lock Hologram */
+        .target-lock {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(2);
+            width: 180px;
+            height: 180px;
+            border: 2px dashed rgba(0, 255, 204, 0.3);
+            border-radius: 50%;
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0;
+            transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* HUD Decoration Crosshairs */
+        .crosshair {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            border: 1px solid rgba(0, 255, 204, 0.3);
+            pointer-events: none;
+        }
+        .ch-tl { top: 40px; left: 40px; border-right: 0; border-bottom: 0; }
+        .ch-tr { top: 40px; right: 40px; border-left: 0; border-bottom: 0; }
+        .ch-bl { bottom: 40px; left: 40px; border-right: 0; border-top: 0; }
+        .ch-br { bottom: 40px; right: 40px; border-left: 0; border-top: 0; }
+
+        @keyframes scanAnim {
+            0% { top: 0%; }
+            50% { top: 100%; }
+            100% { top: 0%; }
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.3; text-shadow: 0 0 2px #00ffcc; }
+            100% { opacity: 1; text-shadow: 0 0 15px #00ffcc; }
+        }
+
+        @keyframes infiniteBlink {
+            0% { 
+                border-color: rgba(0, 255, 204, 0.3); 
+                box-shadow: 0 0 5px rgba(0, 255, 204, 0.05);
+                color: rgba(0, 255, 204, 0.6);
+            }
+            100% { 
+                border-color: #00ffcc; 
+                box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+                color: #ffffff;
+                text-shadow: 0 0 8px #00ffcc;
+                background: rgba(0, 255, 204, 0.18);
+            }
+        }
+
+        /* Responsive Mobile Layout Overrides */
+        @media (max-width: 768px) {
+            .hud-overlay { padding: 15px; }
+            .left-controls-wrapper {
+                top: 20px; left: 15px; right: 15px;
+                width: auto; gap: 10px;
+            }
+            .product-details {
+                padding: 12px;
+                border-left: 3px solid #00ffcc;
+                border-right: none; border-top: none; border-bottom: none;
+            }
+            .detail-row { margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+            .detail-label { font-size: 10px; min-width: 65px; }
+            .detail-value { font-size: 14px; margin-top: 0; }
+            .sizes-container { margin-top: 0; gap: 4px; }
+            .size-badge { padding: 2px 6px; font-size: 10px; }
+            .hud-header { margin-bottom: 6px; font-size: 8px; }
+            .recommendation-badge { font-size: 10px; padding: 8px 10px; }
+            
+            /* Hides right wrapper components on small mobile layout to stay clutter-free */
+            .right-bottom-wrapper { display: none !important; }
+
+            .ar-button {
+                position: fixed; top: auto; bottom: 25px; right: 15px; left: 15px;
+                width: calc(100% - 30px); text-align: center; padding: 12px 0;
+                font-size: 13px; z-index: 10;
+            }
+            model-viewer { height: 60%; top: 22%; }
+            .scan-status { font-size: 14px; padding: 10px 20px; width: 80%; text-align: center; }
+            .target-lock { width: 140px; height: 140px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="hud-bg-grid"></div>
+    <div class="hud-frame"></div>
+    <div class="crosshair ch-tl"></div>
+    <div class="crosshair ch-tr"></div>
+    <div class="crosshair ch-bl"></div>
+    <div class="crosshair ch-br"></div>
+
+    <div class="target-lock" id="targetLock"></div>
+
+    <div class="scan-line" id="scanLine"></div>
+    <div class="scan-status" id="scanStatus">RUNNING PRODUCT SCAN...</div>
+
+    <model-viewer 
+        id="shoeModel"
+        src="Sneakers.glb" 
+        alt="Interactive Pride HUD Product Showcase" 
+        ar 
+        ar-modes="webxr scene-viewer quick-look" 
+        camera-controls 
+        auto-rotate 
+        interaction-prompt="none"
+        shadow-intensity="1">
+        <button slot="ar-button" id="hiddenArBtn" style="display:none;"></button>
+    </model-viewer>
+
+    <div class="hud-overlay">
+        
+        <button class="ar-button interactive" id="arBtn" onclick="openAR()">
+            View in AR
+        </button>
+
+        <div class="left-controls-wrapper">
+            
+            <div class="product-details">
+                <div class="hud-header" id="headerTitle">// INITIALIZING DATA FEED //</div>
+                
+                <div class="detail-row">
+                    <div class="detail-label">MODEL:</div>
+                    <div class="detail-value" id="typeProduct"></div>
+                </div>
+                
+                <div class="detail-row">
+                    <div class="detail-label">COLOR:</div>
+                    <div class="detail-value" id="typeColor"></div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">PRICE:</div>
+                    <div class="detail-value price-color" id="typePrice"></div>
+                </div>
+                
+                <div class="detail-row">
+                    <div class="detail-label">SIZE:</div>
+                    <div class="sizes-container" id="sizesContainer">
+                        <div class="size-badge interactive" onclick="selectSize(this)">7</div>
+                        <div class="size-badge interactive" onclick="selectSize(this)">8</div>
+                        <div class="size-badge interactive" onclick="selectSize(this)">9</div>
+                        <div class="size-badge interactive" onclick="selectSize(this)">10</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="recommendation-badge" id="recBadge">
+                [! Highly Recommended !]
+            </div>
+        </div>
+
+        <div class="right-bottom-wrapper" id="rightWrapper">
+            
+            <div class="right-bottom-controls interactive">
+                <div class="control-title">3D CONTROL PAD</div>
+                <div class="dpad-row">
+                    <div class="dpad-btn" onclick="rotateModel('left')">?</div>
+                    <div class="dpad-btn" onclick="rotateModel('right')">?</div>
+                </div>
+            </div>
+
+            <div class="pride-statement">
+                Wear The Pride, Own The Future
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        const dataToType = [
+            { elementId: 'typeProduct', text: 'CYBER-X SNEAKERS' },
+            { elementId: 'typeColor', text: 'Matte Black' },
+            { elementId: 'typePrice', text: 'Rs. 14,999' }
+        ];
+
+        const modelViewer = document.getElementById('shoeModel');
+
+        // Logic for manual 3D Control Pad rotation
+        function rotateModel(direction) {
+            modelViewer.autoRotate = false; // Disables loop on interaction
+            const orbits = modelViewer.getCameraOrbit();
+            let currentTheta = orbits.theta * (180 / Math.PI); 
+            
+            if (direction === 'left') {
+                currentTheta -= 30;
+            } else if (direction === 'right') {
+                currentTheta += 30;
+            }
+            
+            modelViewer.cameraOrbit = `${currentTheta}deg ${orbits.phi * (180 / Math.PI)}deg auto`;
+        }
+
+        function typeWriter(elementId, text, speed, callback) {
+            let i = 0;
+            const element = document.getElementById(elementId);
+            element.innerHTML = '';
+            
+            function type() {
+                if (i < text.length) {
+                    element.innerHTML += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                } else if (callback) {
+                    callback();
+                }
+            }
+            type();
+        }
+
+        function selectSize(badge) {
+            document.querySelectorAll('.size-badge').forEach(b => b.classList.remove('selected'));
+            badge.classList.add('selected');
+        }
+
+        // Orchestration Sequence Engine
+        window.addEventListener('DOMContentLoaded', () => {
+            typeWriter(dataToType[0].elementId, dataToType[0].text, 70, () => {
+                typeWriter(dataToType[1].elementId, dataToType[1].text, 70, () => {
+                    typeWriter(dataToType[2].elementId, dataToType[2].text, 70, () => {
+                        
+                        const badges = document.querySelectorAll('.size-badge');
+                        badges.forEach((badge, index) => {
+                            setTimeout(() => {
+                                badge.classList.add('show-badge');
+                            }, index * 120);
+                        });
+
+                        document.getElementById('headerTitle').innerText = '// DATA_STREAM_COMPLETE //';
+                        setTimeout(startScanningSequence, 1200);
+                    });
+                });
+            });
+        });
+
+        function startScanningSequence() {
+            const scanLine = document.getElementById('scanLine');
+            const scanStatus = document.getElementById('scanStatus');
+            
+            scanLine.classList.add('active');
+            scanStatus.style.display = 'block';
+
+            setTimeout(() => {
+                scanLine.classList.remove('active');
+                scanStatus.style.display = 'none';
+                
+                const lock = document.getElementById('targetLock');
+                lock.style.opacity = '1';
+                lock.style.transform = 'translate(-50%, -50%) scale(1) rotate(45deg)';
+                
+                revealFinalUI();
+            }, 4000);
+        }
+
+        function revealFinalUI() {
+            document.getElementById('recBadge').classList.add('active-blink');
+            document.getElementById('arBtn').style.opacity = '1';
+            document.getElementById('arBtn').style.transform = 'translateY(0)';
+            
+            // Reveals the integrated control pad and statement text smoothly after scan completes
+            document.getElementById('rightWrapper').style.opacity = '1';
+        }
+
+        function openAR() {
+            const btn = document.getElementById('arBtn');
+            const nativeBtn = document.getElementById('hiddenArBtn');
+            
+            if (nativeBtn) {
+                btn.innerText = "[ LAUNCHING WEBXR... ]";
+                btn.style.borderColor = "#fff";
+                btn.style.color = "#fff";
+                nativeBtn.click();
+                
+                setTimeout(() => {
+                    btn.innerText = "View in AR";
+                    btn.style.borderColor = "#00ffcc";
+                    btn.style.color = "#00ffcc";
+                }, 4000);
+            } else {
+                alert("AR core sub-systems are initializing. Please check device compatibility.");
+            }
+        }
+    </script>
+</body>
+</html>
